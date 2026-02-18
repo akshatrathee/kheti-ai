@@ -1,0 +1,176 @@
+# Megalith LiteLLM Configuration - Specialized Model Mesh
+# Architecture: Heterogeneous Hardware Personas
+# Controller Node: Mac Studio M4
+
+model_list:
+  # ===========================================================================
+  # PERSONA 1: THE CRUNCHERS (RTX 5090s)
+  # ROLE: Heavy Reasoning, Complex Coding, Video/High-End Image Gen
+  # NETWORK: 10GbE High-Performance Island
+  # ===========================================================================
+
+  # DeepSeek-R1 (Reasoning)
+  - model_name: reasoning-cruncher
+    litellm_params:
+      model: ollama/deepseek-r1:latest
+      api_base: http://Cruncher-Internal:11434
+      num_retries: 3
+    model_info:
+      persona: cruncher
+      capability: reasoning
+
+  - model_name: reasoning-cruncher-backup
+    litellm_params:
+      model: ollama/deepseek-r1:latest
+      api_base: http://Cruncher-eGPU:11434
+      num_retries: 3
+    model_info:
+      persona: cruncher
+      capability: reasoning
+
+  # Qwen2.5-Coder (Coding)
+  - model_name: coding-cruncher
+    litellm_params:
+      model: ollama/qwen2.5-coder:latest
+      api_base: http://Cruncher-Internal:11434
+    model_info:
+      persona: cruncher
+      capability: coding
+
+  # Image/Video Generation
+  - model_name: media-cruncher
+    litellm_params:
+      model: ollama/flux-schnell
+      api_base: http://Cruncher-Internal:11434
+    model_info:
+      persona: cruncher
+      capability: image-gen
+
+  # ===========================================================================
+  # PERSONA 2: THE FAT BRAINS (AMD Halo Strix - 128GB Unified RAM)
+  # ROLE: High-Context, Multi-Document RAG, Massive Analysis
+  # NETWORK: 2.5GbE Backbone
+  # ===========================================================================
+
+  - model_name: rag-fatbrain-1
+    litellm_params:
+      model: ollama/llama3:70b
+      api_base: http://Halo-1:11434
+    model_info:
+      persona: fat-brain
+      capability: high-context
+
+  - model_name: rag-fatbrain-2
+    litellm_params:
+      model: ollama/llama3:70b
+      api_base: http://Halo-2:11434
+    model_info:
+      persona: fat-brain
+      capability: high-context
+
+  - model_name: rag-fatbrain-3
+    litellm_params:
+      model: ollama/mixtral:8x22b
+      api_base: http://Halo-3:11434
+    model_info:
+      persona: fat-brain
+      capability: high-context
+
+  # ===========================================================================
+  # PERSONA 3: THE MEDIA LABS (3080Ti / 2080 / Google Corals)
+  # ROLE: Vision (Frigate/Immich Tagging), Voice (Whisper/Piper)
+  # NETWORK: 2.5GbE Backbone
+  # ===========================================================================
+
+  - model_name: vision-medialab-primary
+    litellm_params:
+      model: ollama/llama3.2-vision
+      api_base: http://MediaLab-3080Ti:11434
+    model_info:
+      persona: media-lab
+      capability: vision
+
+  - model_name: vision-medialab-backup
+    litellm_params:
+      model: ollama/llama3.2-vision
+      api_base: http://MediaLab-2080:11434
+    model_info:
+      persona: media-lab
+      capability: vision
+
+  - model_name: voice-whisper
+    litellm_params:
+      model: ollama/whisper:large-v3
+      api_base: http://MediaLab-2080:11434
+    model_info:
+      persona: media-lab
+      capability: voice
+
+  # ===========================================================================
+  # PERSONA 4: THE MICRO-LOGIC SWARM (Pi 5s & Mini PCs)
+  # ROLE: Function Calling, MCP Routers, Lightweight Interconnects
+  # NETWORK: 1GbE Pi Cluster
+  # ===========================================================================
+
+  - model_name: swarm-atom-1
+    litellm_params:
+      model: ollama/llama3.2:3b
+      api_base: http://Pi-01:11434
+    model_info:
+      persona: swarm
+      capability: light-logic
+
+  - model_name: swarm-atom-mini-1
+    litellm_params:
+      model: ollama/llama3.2:1b
+      api_base: http://MiniPC-01:11434
+    model_info:
+      persona: swarm
+      capability: light-logic
+
+# =============================================================================
+# ROUTER & FAILOVER SETTINGS
+# =============================================================================
+router_settings:
+  routing_strategy: usage-based-routing-v2
+  enable_health_checks: true
+  health_check_interval: 30
+
+  # MODEL GROUPS (PRIORITY ROUTING)
+  model_group_alias:
+    # REASONING GROUP
+    "reasoning":
+      - model_name: reasoning-cruncher
+      - model_name: reasoning-cruncher-backup
+      - model_name: rag-fatbrain-1 # Failover to Fat Brains (CPU but high RAM)
+
+    # CODING GROUP
+    "code":
+      - model_name: coding-cruncher
+      - model_name: rag-fatbrain-2 # CPU Failover
+
+    # VISION GROUP
+    "vision":
+      - model_name: vision-medialab-primary
+      - model_name: vision-medialab-backup
+
+    # GENERAL LOGIC SHORTHANDS
+    "fast":
+      - model_name: swarm-atom-1
+      - model_name: swarm-atom-mini-1
+
+    # COMPATIBILITY
+    "gpt-4": reasoning
+    "gpt-4o": vision
+    "gpt-3.5-turbo": fast
+
+# =============================================================================
+# GLOBAL LITELM SETTINGS
+# =============================================================================
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  telemetry: false
+
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY}

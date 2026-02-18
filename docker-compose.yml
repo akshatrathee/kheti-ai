@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Main LiteLLM Proxy - The orchestrator
+  # Main LiteLLM Proxy - The Megalith Router
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm-proxy
@@ -11,13 +11,13 @@ services:
       - ./litellm_config.yaml:/app/config.yaml:ro
       - ./litellm_data:/app/data
     environment:
-      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - LITELLM_MASTER_KEY=sk-akshat-homelab-key-change-this
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
       - LITELLM_LOG=INFO
       - STORE_MODEL_IN_DB=true
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "8"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,38 +25,82 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/readiness"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
     networks:
-      - litellm-network
+      - megalith-network
 
-  # PostgreSQL - For logging, caching, model configs
+  # OpenWebUI - Primary Frontend
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    ports:
+      - "3000:8080"
+    environment:
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+    volumes:
+      - open-webui_data:/app/backend/data
+    depends_on:
+      - litellm
+    restart: unless-stopped
+    networks:
+      - megalith-network
+
+  # Netdata - Resource Monitoring
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    ports:
+      - "19999:19999"
+    volumes:
+      - netdataconfig:/etc/netdata
+      - netdatalib:/var/lib/netdata
+      - netdatacache:/var/cache/netdata
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+    environment:
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN}
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud
+      - NETDATA_CLAIM_ROOMS=${NETDATA_CLAIM_ROOMS}
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    restart: unless-stopped
+    networks:
+      - megalith-network
+
+  # PostgreSQL - Persistence
   postgres:
     image: postgres:16-alpine
-    container_name: litellm-postgres
+    container_name: megalith-postgres
     environment:
-      - POSTGRES_USER=litellm
-      - POSTGRES_PASSWORD=litellm_password
-      - POSTGRES_DB=litellm
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - litellm-network
+      - megalith-network
 
-  # Redis - For caching responses and rate limiting
+  # Redis - Caching
   redis:
     image: redis:7-alpine
-    container_name: litellm-redis
-    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    container_name: megalith-redis
+    command: redis-server --maxmemory 1gb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -66,53 +110,16 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - litellm-network
-
-  # Optional: Prometheus for metrics
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: litellm-prometheus
-    profiles: ["monitoring"]
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-    restart: unless-stopped
-    networks:
-      - litellm-network
-
-  # Optional: Grafana for dashboards
-  grafana:
-    image: grafana/grafana:latest
-    container_name: litellm-grafana
-    profiles: ["monitoring"]
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=redis-datasource
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
-    restart: unless-stopped
-    depends_on:
-      - prometheus
-    networks:
-      - litellm-network
+      - megalith-network
 
 networks:
-  litellm-network:
+  megalith-network:
     driver: bridge
 
 volumes:
+  open-webui_data:
   postgres_data:
   redis_data:
-  prometheus_data:
-  grafana_data:
+  netdataconfig:
+  netdatalib:
+  netdatacache:

@@ -1,241 +1,97 @@
-# Kheti AI - Distributed Model Mesh
+# Megalith - Private Multi-Node AI Utility Provider
 
-**Single API endpoint for all your AI models** - local and cloud.
+## Heterogeneous Model Mesh for High-Performance AI
 
-Smart orchestration across your homelab GPUs, CPUs, NPUs, and cloud APIs with intelligent routing, redundancy, and cost optimization.
+Megalith transforms a cluster of isolated hardware—from RTX 5090s to Raspberry Pis—into a specialized utility farm. By assigning **Personas** based on hardware strengths, it achieves zero-latency serving (TTFT < 100ms) and intelligent routing across specialized tiers.
 
-🌐 **OpenAI-compatible API** • 🚀 **Auto-routing** • 💰 **Cost-optimized** • 🔒 **Tailscale-secured**
+🌐 **OpenWebUI Frontend** • 🚀 **Persona-Based Routing** • ⚡ **Zero-Latency Pinning** • 🛡️ **Failover Resilience**
 
 ---
 
-## ⚡ Quick Start (5 Minutes)
+## 🏗️ The Architecture (Persona Strategy)
 
-### On Pi5L (or any orchestrator machine):
+Rather than one machine doing everything, Megalith fragments tasks across specialized nodes:
+
+### 🟢 1. The "Cruncher" (RTX 5090 Nodes)
+
+**Priority:** Ultra-Low Latency Reasoning & Coding.
+
+#### Environment Tuning
+
+DeepSeek-R1, Qwen2.5-Coder
+
+### 🔵 2. The "Fat Brains" (AMD Halo Strix)
+
+**Priority:** High-Context Analysis & RAG.
+
+#### Environment Tuning
+
+Llama-3-70B, Mixtral
+
+### 🟠 3. The "Media Lab" (3080Ti / 2080 / Corals)
+
+**Priority:** Vision & Voice Processing.
+
+#### Environment Tuning
+
+Llava, Whisper, Frigate
+
+### ⚪ 4. The "Micro-Logic Swarm" (Pi 5s)
+
+**Priority:** Function Calling & Tool Routing.
+
+#### Environment Tuning
+
+Llama-3.2-3B, MCP Agents
+
+---
+
+## ⚡ Quick Start (Controller Deployment)
+
+On your **Mac Studio M4 (Controller Node)**:
 
 ```bash
-# Clone the repository
-git clone https://github.com/akshatrathee/kheti-ai.git
-cd kheti-ai
+# 1. Clone & Configure
+git clone https://github.com/akshatrathee/kheti-ai.git megalith
+cd megalith
+cp .env.example .env # Add your keys
 
-# Initial setup (interactive - configures API keys)
-chmod +x setup.sh
-./setup.sh
-
-# That's it! Your orchestrator is running.
-```
-
-**Access your API at:** `https://pi5l.tailf49db2.ts.net/llm`
-
----
-
-## 📚 Documentation
-
-| Document | Purpose |
-|----------|---------|
-| **[MASTER_README.md](MASTER_README.md)** | Complete guide & architecture |
-| **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** | Daily cheat sheet |
-| **[MODEL_DISTRIBUTION.md](MODEL_DISTRIBUTION.md)** | Hardware specs & model assignments |
-| **[TAILSCALE_SETUP.md](TAILSCALE_SETUP.md)** | Remote access configuration |
-
----
-
-## 🏗️ Architecture
-
-```
-Your Apps (VSCode, Python, etc.)
-         ↓
-LiteLLM Orchestrator (Pi5L)
-    ↓           ↓            ↓
-Local Ollama   Cloud APIs   NPU/Metal
-(RTX 5090)     (Claude/GPT) (Experimental)
-```
-
-**Naming Convention:** `SIZE-LOCATION-COST-MODEL_NAME`
-- `XL-LOC-FRE-qwen2.5-coder-32b` = 32B code model on local GPU
-- `S-CLD-PAY-gpt-4o-mini` = Small cloud model (paid)
-
----
-
-## 🎯 Features
-
-✅ **Single API** - One endpoint for all models  
-✅ **Smart Routing** - Weighted by speed (40%), quality (35%), cost (25%)  
-✅ **Auto-failover** - Redundancy across machines  
-✅ **Response Caching** - Save API costs  
-✅ **Multi-modal** - Code, vision, voice, image generation  
-✅ **OpenAI Compatible** - Drop-in replacement  
-
----
-
-## 📦 What's Included
-
-- **LiteLLM Orchestrator** - Smart routing proxy
-- **PostgreSQL** - Request logging & model configs
-- **Redis** - Response caching
-- **Grafana + Prometheus** - Monitoring (optional)
-- **Tailscale Integration** - Secure remote access
-- **Model Templates** - Ready for 19+ machines
-
----
-
-## 🎮 Usage
-
-### Python
-
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    api_key="YOUR_MASTER_KEY",
-    base_url="https://pi5l.tailf49db2.ts.net/llm"
-)
-
-# Auto-routes to best local model
-response = client.chat.completions.create(
-    model="code",
-    messages=[{"role": "user", "content": "Write Rust code"}]
-)
-```
-
-### cURL
-
-```bash
-curl https://pi5l.tailf49db2.ts.net/llm/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_KEY" \
-  -d '{
-    "model": "fast",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-### VSCode (Continue.dev)
-
-```json
-{
-  "models": [{
-    "provider": "openai",
-    "model": "code",
-    "apiBase": "https://pi5l.tailf49db2.ts.net/llm",
-    "apiKey": "YOUR_MASTER_KEY"
-  }]
-}
-```
-
----
-
-## 🔄 Updates
-
-Pull latest changes and redeploy:
-
-```bash
-cd kheti-ai
-git pull
-docker-compose down
+# 2. Deploy Infrastructure
 docker-compose up -d
 ```
 
----
+**Access Points:**
 
-## 🛠️ Current Setup
-
-### ✅ Configured & Ready
-- **Akshat-PC (RTX 5090):** 54 models mapped
-- **Cloud APIs:** Templates ready
-- **Pi5L:** Orchestrator deployment ready
-
-### ⏭ Add When Ready
-- **11 Mini PCs:** Templates in config (commented)
-- **1 Mac Mini:** Template ready
-- **11 Raspberry Pis:** For monitoring
-
-See [MODEL_DISTRIBUTION.md](MODEL_DISTRIBUTION.md) for details.
+- **OpenWebUI:** `http://localhost:3000`
+- **LiteLLM Router:** `http://localhost:4000`
+- **Netdata Monitoring:** `http://localhost:19999`
 
 ---
 
-## 🔧 Common Commands
+## 📚 Specialized Guides
 
-```bash
-# Check status
-docker ps
-docker logs -f litellm-proxy
-
-# Restart
-docker restart litellm-proxy
-
-# Update config
-nano litellm_config_production.yaml
-docker restart litellm-proxy
-
-# View costs
-# Open: https://pi5l.tailf49db2.ts.net/llm/ui
-```
+- **[PERSONAS.md](PERSONAS.md)**: Hardware tuning & environment variables for each tier.
+- **[STORAGE.md](STORAGE.md)**: Master-Slave sync logic for NAS and local NVMe.
+- **[test_client.py](test_client.py)**: Verify routing across the persona mesh.
 
 ---
 
-## 📍 Hardware Requirements
+## 🎯 Core Principles
 
-**Orchestrator (Pi5L):**
-- Raspberry Pi 5 (4GB+) OR
-- Mini PC (4GB+ RAM)
-- Docker installed
-- Tailscale configured
-
-**Ollama Machines:**
-- Any machine with Ollama installed
-- Network accessible (Tailscale recommended)
+1. **Zero-Latency Priority**: All models are pinned in VRAM/RAM (`KEEP_ALIVE=-1`) on high-performance nodes to ensure instant TTFT.
+2. **Specialized Mesh**: LiteLLM routes "Code" to GPUs and "Context" to High-RAM CPU nodes.
+3. **Resilient Failover**: If a GPU node hits a limit, traffic cascades to the "Fat Brain" CPU cluster.
+4. **Master-Slave Storage**: NAS stores the library; local NVMe serves the active models to avoid network bottlenecks.
 
 ---
 
-## 🔐 Security
+## 🎮 Consumption ecosystem
 
-- API key required for all requests
-- Tailscale for secure remote access
-- Cloud API keys stored in `.env` (not committed)
-- Change default passwords before production
-
----
-
-## 💰 Cost
-
-- **Local models:** Free (electricity only)
-- **Cloud APIs:** Pay per token
-- **Budget limit:** Configurable (default $100/month)
-- **Monitoring:** Track costs in admin UI
+Megalith is designed to serve:
+Agent0 • OpenLLM • Frigate • Immich • ComfyUI • n8n • Home Assistant
 
 ---
 
 ## 📄 License
 
-MIT License - See LICENSE file
-
----
-
-## 🙏 Credits
-
-Built with:
-- [LiteLLM](https://github.com/BerriAI/litellm) - Model orchestration
-- [Ollama](https://ollama.ai) - Local model serving
-- [Tailscale](https://tailscale.com) - Secure networking
-
----
-
-## 📞 Support
-
-- **Issues:** [GitHub Issues](https://github.com/akshatrathee/kheti-ai/issues)
-- **Docs:** See [MASTER_README.md](MASTER_README.md)
-- **Quick Help:** See [QUICK_REFERENCE.md](QUICK_REFERENCE.md)
-
----
-
-## 🚀 Next Steps
-
-1. ✅ Clone repo
-2. ✅ Run `./setup.sh`
-3. ⏭ Add more Ollama machines (see [MODEL_DISTRIBUTION.md](MODEL_DISTRIBUTION.md))
-4. ⏭ Enable monitoring (run `./deploy.sh` → option 2)
-5. ⏭ Integrate with your apps
-
----
-
-**Your homelab, your models, your API.** 🎯
+MIT License - Built for the future of private AI utility.
